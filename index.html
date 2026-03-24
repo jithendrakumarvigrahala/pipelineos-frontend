@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PipelineOS — BDR Command Center</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --blue: #0071e3; --blue-h: #0077ed;
+    --dark: #1d1d1f; --mid: #6e6e73;
+    --light: #f5f5f7; --white: #ffffff;
+    --border: rgba(0,0,0,0.08);
+    --glass: rgba(255,255,255,0.72);
+    --glass-b: rgba(255,255,255,0.5);
+    --shadow: 0 8px 40px rgba(0,0,0,0.12);
+    --sidebar: 240px; --r: 18px; --rs: 12px;
+    --font: -apple-system,"SF Pro Display",BlinkMacSystemFont,Inter,sans-serif;
+    --green: #34c759; --orange: #ff9500; --red: #ff3b30;
+    --purple: #af52de; --teal: #5ac8fa;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: var(--font); background: #e8e8ed; color: var(--dark); -webkit-font-smoothing: antialiased; }
+  body::before {
+    content: ''; position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse 80% 60% at 20% 0%,rgba(0,113,227,.15) 0%,transparent 60%),
+      radial-gradient(ellipse 60% 50% at 80% 100%,rgba(175,82,222,.10) 0%,transparent 60%),
+      linear-gradient(160deg,#f0f0f5 0%,#e2e2ea 100%);
+  }
+  #app { position: relative; z-index: 1; display: flex; height: 100vh; overflow: hidden; }
+
+  /* SIDEBAR */
+  #sidebar {
+    width: var(--sidebar); flex-shrink: 0;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(40px) saturate(180%);
+    border-right: 1px solid rgba(255,255,255,0.7);
+    display: flex; flex-direction: column; padding: 24px 0;
+    box-shadow: 1px 0 20px rgba(0,0,0,0.06);
+  }
+  .sidebar-logo { padding: 0 20px 24px; border-bottom: 1px solid rgba(0,0,0,0.06); margin-bottom: 12px; }
+  .logo-mark { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg,var(--blue),#5ac8fa); display: flex; align-items: center; justify-content: center; font-size: 16px; color: white; font-weight: 700; box-shadow: 0 4px 12px rgba(0,113,227,0.35); }
+  .logo-text { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .logo-sub { font-size: 10px; color: var(--mid); letter-spacing: 0.5px; text-transform: uppercase; }
+  .nav-section { padding: 0 12px; margin-bottom: 6px; }
+  .nav-label { font-size: 10px; font-weight: 600; color: var(--mid); letter-spacing: 0.8px; text-transform: uppercase; padding: 8px 8px 4px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 500; color: #444; transition: all .15s; user-select: none; }
+  .nav-item:hover { background: rgba(0,0,0,0.05); color: var(--dark); }
+  .nav-item.active { background: rgba(0,113,227,0.1); color: var(--blue); }
+  .nav-icon { font-size: 16px; width: 22px; text-align: center; }
+  .nav-badge { margin-left: auto; background: var(--blue); color: white; border-radius: 20px; font-size: 10px; font-weight: 600; padding: 1px 6px; min-width: 18px; text-align: center; }
+  .sidebar-footer { margin-top: auto; padding: 12px; border-top: 1px solid rgba(0,0,0,0.06); }
+  .user-card { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; cursor: pointer; transition: background .15s; }
+  .user-card:hover { background: rgba(0,0,0,0.04); }
+  .user-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; flex-shrink: 0; }
+  .user-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-role { font-size: 11px; color: var(--mid); }
+
+  /* MAIN */
+  #main { flex: 1; overflow-y: auto; padding: 32px; display: flex; flex-direction: column; gap: 24px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+  .page-title { font-size: 28px; font-weight: 700; letter-spacing: -0.8px; }
+  .page-sub { font-size: 14px; color: var(--mid); margin-top: 2px; }
+
+  /* GLASS CARD */
+  .glass-card { background: var(--glass); backdrop-filter: blur(40px) saturate(180%); border: 1px solid var(--glass-b); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+
+  /* STATS */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(160px,1fr)); gap: 14px; }
+  .stat-card { background: var(--glass); backdrop-filter: blur(40px) saturate(180%); border: 1px solid var(--glass-b); border-radius: var(--rs); box-shadow: var(--shadow); padding: 18px 16px; position: relative; overflow: hidden; }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .stat-card.blue::before { background: linear-gradient(90deg,var(--blue),#5ac8fa); }
+  .stat-card.green::before { background: linear-gradient(90deg,var(--green),#30d158); }
+  .stat-card.orange::before { background: linear-gradient(90deg,var(--orange),#ffd60a); }
+  .stat-card.purple::before { background: linear-gradient(90deg,var(--purple),#bf5af2); }
+  .stat-card.red::before { background: linear-gradient(90deg,var(--red),#ff6961); }
+  .stat-card.teal::before { background: linear-gradient(90deg,var(--teal),#64d2ff); }
+  .stat-icon { font-size: 22px; margin-bottom: 10px; }
+  .stat-value { font-size: 28px; font-weight: 700; letter-spacing: -1px; }
+  .stat-label { font-size: 12px; color: var(--mid); font-weight: 500; margin-top: 2px; }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 980px; font-size: 13px; font-weight: 600; font-family: var(--font); cursor: pointer; border: none; transition: all .15s; white-space: nowrap; }
+  .btn-primary { background: var(--blue); color: white; }
+  .btn-primary:hover { background: var(--blue-h); transform: scale(1.02); }
+  .btn-secondary { background: rgba(0,0,0,0.06); color: var(--dark); border: 1px solid rgba(0,0,0,0.1); }
+  .btn-secondary:hover { background: rgba(0,0,0,0.10); }
+  .btn-danger { background: rgba(255,59,48,0.1); color: var(--red); }
+  .btn-danger:hover { background: rgba(255,59,48,0.18); }
+  .btn-green { background: var(--green); color: white; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* FORMS */
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label { font-size: 13px; font-weight: 600; }
+  .form-input, .form-select, .form-textarea {
+    padding: 11px 14px; border-radius: 12px; border: 1.5px solid rgba(0,0,0,0.12);
+    background: rgba(255,255,255,0.8); font-size: 14px; font-family: var(--font);
+    color: var(--dark); transition: border-color .15s, box-shadow .15s; outline: none;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,113,227,0.12); }
+  .form-textarea { resize: vertical; min-height: 80px; }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; font-weight: 600; color: var(--mid); letter-spacing: 0.5px; text-transform: uppercase; padding: 12px 16px; border-bottom: 1px solid rgba(0,0,0,0.07); }
+  td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid rgba(0,0,0,0.04); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(0,0,0,0.02); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.4); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: rgba(255,255,255,0.92); backdrop-filter: blur(60px) saturate(200%); border: 1px solid rgba(255,255,255,0.8); border-radius: 22px; box-shadow: 0 30px 80px rgba(0,0,0,0.25); padding: 30px; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; animation: slideUp .3s cubic-bezier(.34,1.56,.64,1); }
+  .modal-lg { max-width: 680px; }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+  .modal-title { font-size: 19px; font-weight: 700; letter-spacing: -0.4px; }
+  .modal-close { width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.07); border: none; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .modal-close:hover { background: rgba(0,0,0,0.14); }
+
+  /* PILLS */
+  .pill { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .pill-blue { background: rgba(0,113,227,0.1); color: var(--blue); }
+  .pill-green { background: rgba(52,199,89,0.12); color: #248a3d; }
+  .pill-orange { background: rgba(255,149,0,0.12); color: #9a4f00; }
+  .pill-red { background: rgba(255,59,48,0.1); color: var(--red); }
+  .pill-purple { background: rgba(175,82,222,0.1); color: var(--purple); }
+  .pill-gray { background: rgba(0,0,0,0.07); color: var(--mid); }
+
+  /* AVATAR */
+  .avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: white; flex-shrink: 0; }
+  .avatar-sm { width: 28px; height: 28px; font-size: 11px; }
+  .avatar-lg { width: 48px; height: 48px; font-size: 17px; }
+  .c0{background:#0071e3}.c1{background:#34c759}.c2{background:#ff9500}.c3{background:#af52de}.c4{background:#ff3b30}.c5{background:#5ac8fa}.c6{background:#ff6b35}.c7{background:#32ade6}
+
+  /* LOGIN */
+  #login-screen { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse 80% 60% at 20% 0%,rgba(0,113,227,.2) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 100%,rgba(175,82,222,.15) 0%,transparent 60%),linear-gradient(160deg,#f0f0f5 0%,#e2e2ea 100%); }
+  .login-card { background: rgba(255,255,255,0.75); backdrop-filter: blur(60px) saturate(200%); border: 1px solid rgba(255,255,255,0.7); border-radius: 28px; box-shadow: 0 40px 100px rgba(0,0,0,0.18); padding: 44px 40px; width: 100%; max-width: 400px; text-align: center; }
+  .logo-icon-lg { width: 64px; height: 64px; border-radius: 18px; margin: 0 auto 14px; background: linear-gradient(135deg,var(--blue),#5ac8fa); display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; color: white; box-shadow: 0 8px 28px rgba(0,113,227,0.4); }
+  .login-title { font-size: 24px; font-weight: 700; letter-spacing: -0.6px; }
+  .login-sub { font-size: 14px; color: var(--mid); margin-top: 4px; }
+  .login-form { display: flex; flex-direction: column; gap: 14px; margin-top: 28px; }
+  .login-error { color: var(--red); font-size: 12px; font-weight: 500; }
+
+  /* SECTION */
+  .section-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 14px; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .section-title { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+
+  /* FEED */
+  .feed-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 20px; border-bottom: 1px solid rgba(0,0,0,0.04); }
+  .feed-item:last-child { border-bottom: none; }
+  .feed-text { font-size: 13px; line-height: 1.5; }
+  .feed-time { font-size: 11px; color: var(--mid); margin-top: 2px; }
+
+  /* TIMESHEET */
+  .ts-metric { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }
+  .ts-metric:last-child { border-bottom: none; }
+  .ts-metric-info { display: flex; align-items: center; gap: 12px; }
+  .ts-metric-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .ts-metric-name { font-size: 14px; font-weight: 600; }
+  .ts-metric-desc { font-size: 12px; color: var(--mid); }
+  .ts-counter { display: flex; align-items: center; gap: 8px; }
+  .ts-counter-btn { width: 30px; height: 30px; border-radius: 50%; border: none; background: rgba(0,0,0,0.07); font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .ts-counter-btn:hover { background: rgba(0,0,0,0.14); }
+  .ts-counter-val { width: 54px; text-align: center; font-size: 16px; font-weight: 700; padding: 6px 8px; border-radius: 8px; border: 1.5px solid rgba(0,0,0,0.12); background: rgba(255,255,255,0.8); font-family: var(--font); outline: none; }
+  .ts-counter-val:focus { border-color: var(--blue); }
+
+  /* POD */
+  .pod-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 16px; }
+  .pod-card { background: var(--glass); backdrop-filter: blur(40px) saturate(180%); border: 1px solid var(--glass-b); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; transition: transform .2s, box-shadow .2s; }
+  .pod-card:hover { transform: translateY(-2px); box-shadow: 0 16px 48px rgba(0,0,0,0.15); }
+  .pod-member-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.04); }
+  .pod-member-row:last-child { border-bottom: none; }
+
+  /* TASK */
+  .task-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 18px; border-bottom: 1px solid rgba(0,0,0,0.05); }
+  .task-item:last-child { border-bottom: none; }
+  .task-check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(0,0,0,0.2); flex-shrink: 0; cursor: pointer; margin-top: 2px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
+  .task-check.done { background: var(--green); border-color: var(--green); color: white; }
+  .task-title { font-size: 14px; font-weight: 500; }
+  .task-title.done-text { text-decoration: line-through; color: var(--mid); }
+  .task-meta { font-size: 12px; color: var(--mid); margin-top: 3px; }
+
+  /* LEADERBOARD */
+  .lb-row { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-bottom: 1px solid rgba(0,0,0,0.04); }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-rank { font-size: 14px; font-weight: 700; color: var(--mid); width: 20px; }
+  .lb-rank.gold { color: #ffd700; }
+  .lb-rank.silver { color: #a8a9ad; }
+  .lb-rank.bronze { color: #cd7f32; }
+
+  /* EMPTY STATE */
+  .empty-state { padding: 40px 20px; text-align: center; color: var(--mid); }
+  .empty-icon { font-size: 40px; margin-bottom: 12px; opacity: .5; }
+  .empty-title { font-size: 16px; font-weight: 600; color: var(--dark); margin-bottom: 6px; }
+  .empty-desc { font-size: 13px; }
+
+  /* TOAST */
+  #toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(29,29,31,0.9); color: white; backdrop-filter: blur(20px); padding: 12px 22px; border-radius: 980px; font-size: 14px; font-weight: 500; z-index: 10000; opacity: 0; transition: opacity .3s, transform .3s; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+
+  /* SPINNER */
+  .spinner { width: 20px; height: 20px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* LOADING OVERLAY */
+  #loading { position: fixed; inset: 0; z-index: 9998; background: rgba(240,240,245,0.9); backdrop-filter: blur(10px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+  #loading .logo-icon-lg { margin: 0; }
+
+  /* COLOR SWATCHES */
+  .color-swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .color-swatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform .15s; }
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.selected { border-color: var(--dark); transform: scale(1.1); }
+
+  /* GRIDS */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+  @media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+  @media (max-width: 768px) { #sidebar { display: none; } #main { padding: 16px; } }
+
+  /* PAGES */
+  .page { display: none; flex-direction: column; gap: 24px; animation: slideIn .25s ease; }
+  .page.active { display: flex; }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  @keyframes slideUp { from{opacity:0;transform:translateY(24px) scale(.97)} to{opacity:1;transform:translateY(0) scale(1)} }
+  @keyframes slideIn { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="logo-icon-lg">P</div>
+  <div style="font-size:16px;font-weight:600;color:var(--dark)">PipelineOS</div>
+  <div class="spinner"></div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen" style="display:none">
+  <div class="login-card">
+    <div style="margin-bottom:28px">
+      <div class="logo-icon-lg">P</div>
+      <div class="login-title">PipelineOS</div>
+      <div class="login-sub">BDR Command Center</div>
+    </div>
+    <div class="login-form">
+      <div class="form-group">
+        <input class="form-input" id="login-email" placeholder="Email address" type="email" autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <input class="form-input" id="login-password" placeholder="Password" type="password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+      </div>
+      <div id="login-error" class="login-error" style="display:none"></div>
+      <button class="btn btn-primary" id="login-btn" style="width:100%;justify-content:center;padding:13px;" onclick="doLogin()">Sign In</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" style="display:none">
+  <nav id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <div class="logo-icon">P</div>
+        <div>
+          <div class="logo-text">PipelineOS</div>
+          <div class="logo-sub">BDR Command Center</div>
+        </div>
+      </div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Overview</div>
+      <div class="nav-item active" data-page="dashboard" onclick="nav('dashboard',this)"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" data-page="leaderboard" onclick="nav('leaderboard',this)"><span class="nav-icon">🏆</span> Leaderboard</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">My Work</div>
+      <div class="nav-item" data-page="timesheet" onclick="nav('timesheet',this)"><span class="nav-icon">⏱️</span> Daily Log</div>
+      <div class="nav-item" data-page="mytasks" onclick="nav('mytasks',this)"><span class="nav-icon">✅</span> My Tasks <span id="task-badge" class="nav-badge" style="display:none">0</span></div>
+    </div>
+    <div class="nav-section" id="admin-nav" style="display:none">
+      <div class="nav-label">Admin</div>
+      <div class="nav-item" data-page="pods" onclick="nav('pods',this)"><span class="nav-icon">🫧</span> PODs</div>
+      <div class="nav-item" data-page="users" onclick="nav('users',this)"><span class="nav-icon">👥</span> Users</div>
+      <div class="nav-item" data-page="tasks" onclick="nav('tasks',this)"><span class="nav-icon">📋</span> Assign Tasks</div>
+      <div class="nav-item" data-page="reports" onclick="nav('reports',this)"><span class="nav-icon">📊</span> Reports</div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-card" onclick="nav('profile',null)">
+        <div class="user-avatar c0" id="sidebar-avatar"></div>
+        <div style="flex:1;min-width:0">
+          <div class="user-name" id="sidebar-name"></div>
+          <div class="user-role" id="sidebar-role"></div>
+        </div>
+      </div>
+      <button class="btn btn-danger" style="width:100%;justify-content:center;margin-top:8px;font-size:12px;" onclick="doLogout()">🚪 Sign Out</button>
+    </div>
+  </nav>
+
+  <main id="main">
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title" id="dash-greeting">Good morning 👋</div>
+          <div class="page-sub" id="dash-date"></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <select class="form-select" id="dash-filter" style="padding:8px 12px;font-size:13px" onchange="renderDashboard()">
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+          </select>
+          <select class="form-select" id="dash-pod-filter" style="padding:8px 12px;font-size:13px" onchange="renderDashboard()">
+            <option value="all">All PODs</option>
+          </select>
+        </div>
+      </div>
+      <div><div style="font-size:13px;font-weight:600;color:var(--mid);margin-bottom:10px;letter-spacing:0.3px;text-transform:uppercase">Team Overview</div>
+        <div class="stats-grid" id="team-stats"></div>
+      </div>
+      <div class="grid-2">
+        <div class="glass-card">
+          <div class="section-header"><div class="section-title">Activity by Member</div></div>
+          <div id="member-activity-table" class="table-wrap"></div>
+        </div>
+        <div class="glass-card">
+          <div class="section-header"><div class="section-title">Recent Activity</div></div>
+          <div id="activity-feed"></div>
+        </div>
+      </div>
+      <div class="glass-card" id="pod-perf-section">
+        <div class="section-header"><div class="section-title">POD Performance</div></div>
+        <div id="pod-performance" style="padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px"></div>
+      </div>
+    </div>
+
+    <!-- LEADERBOARD -->
+    <div class="page" id="page-leaderboard">
+      <div class="page-header">
+        <div><div class="page-title">🏆 Leaderboard</div><div class="page-sub">Top performers by activity score</div></div>
+        <select class="form-select" id="lb-filter" style="padding:8px 12px;font-size:13px" onchange="renderLeaderboard()">
+          <option value="today">Today</option>
+          <option value="week">This Week</option>
+          <option value="month">This Month</option>
+        </select>
+      </div>
+      <div class="glass-card" id="leaderboard-content"></div>
+    </div>
+
+    <!-- TIMESHEET -->
+    <div class="page" id="page-timesheet">
+      <div class="page-header">
+        <div><div class="page-title">⏱️ Daily Log</div><div class="page-sub">Record your daily activity</div></div>
+        <input type="date" class="form-input" id="ts-date" style="width:160px" onchange="loadTimesheetForDate()"/>
+      </div>
+      <div class="grid-2">
+        <div class="glass-card" style="padding:22px">
+          <div class="section-title" style="margin-bottom:18px">📝 Today's Metrics</div>
+          <div id="ts-metrics"></div>
+          <div style="margin-top:18px;display:flex;gap:10px">
+            <button class="btn btn-primary" onclick="saveTimesheet()" style="flex:1;justify-content:center" id="ts-save-btn">Save Entry</button>
+            <button class="btn btn-secondary" onclick="resetTimesheet()">Reset</button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="glass-card" style="padding:18px">
+            <div class="section-title" style="margin-bottom:12px">📅 My History</div>
+            <div id="ts-history" style="max-height:280px;overflow-y:auto"></div>
+          </div>
+          <div class="glass-card" style="padding:18px">
+            <div class="section-title" style="margin-bottom:12px">📈 My Stats (All Time)</div>
+            <div id="ts-personal-stats"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MY TASKS -->
+    <div class="page" id="page-mytasks">
+      <div class="page-header">
+        <div><div class="page-title">✅ My Tasks</div><div class="page-sub">Tasks assigned to you by your manager</div></div>
+      </div>
+      <div class="glass-card" id="mytasks-content"></div>
+    </div>
+
+    <!-- PODS (admin) -->
+    <div class="page" id="page-pods">
+      <div class="page-header">
+        <div><div class="page-title">🫧 POD Management</div><div class="page-sub">Create and manage sales PODs</div></div>
+        <button class="btn btn-primary" onclick="openModal('modal-create-pod')">+ Create POD</button>
+      </div>
+      <div class="pod-grid" id="pods-grid"></div>
+    </div>
+
+    <!-- USERS (admin) -->
+    <div class="page" id="page-users">
+      <div class="page-header">
+        <div><div class="page-title">👥 Team Members</div><div class="page-sub">Manage your BDR team</div></div>
+        <button class="btn btn-primary" onclick="openModal('modal-create-user')">+ Add Member</button>
+      </div>
+      <div class="glass-card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Member</th><th>Role</th><th>POD</th><th>Email</th><th>Type</th><th>Actions</th></tr></thead>
+            <tbody id="users-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TASKS (admin) -->
+    <div class="page" id="page-tasks">
+      <div class="page-header">
+        <div><div class="page-title">📋 Task Manager</div><div class="page-sub">Assign tasks and follow-ups to your team</div></div>
+        <button class="btn btn-primary" onclick="openModal('modal-create-task')">+ Assign Task</button>
+      </div>
+      <div class="glass-card" id="tasks-list"></div>
+    </div>
+
+    <!-- REPORTS (admin) -->
+    <div class="page" id="page-reports">
+      <div class="page-header">
+        <div><div class="page-title">📊 Reports</div><div class="page-sub">Export team performance reports as Excel</div></div>
+        <button class="btn btn-green" onclick="exportExcelReport()">⬇ Download Excel Report</button>
+      </div>
+      <div class="grid-2">
+        <div class="glass-card" style="padding:22px">
+          <div class="section-title" style="margin-bottom:16px">📅 Report Date Range</div>
+          <div class="form-group" style="margin-bottom:14px">
+            <label class="form-label">Start Date</label>
+            <input class="form-input" id="report-start" type="date"/>
+          </div>
+          <div class="form-group" style="margin-bottom:18px">
+            <label class="form-label">End Date</label>
+            <input class="form-input" id="report-end" type="date"/>
+          </div>
+          <button class="btn btn-green" onclick="exportExcelReport()" style="width:100%;justify-content:center">⬇ Download Excel Report</button>
+        </div>
+        <div class="glass-card" style="padding:22px">
+          <div class="section-title" style="margin-bottom:16px">⚙️ Report Settings</div>
+          <div class="form-group" style="margin-bottom:14px">
+            <label class="form-label">Manager Email</label>
+            <input class="form-input" id="report-email" type="email" placeholder="manager@company.com"/>
+          </div>
+          <div class="form-group" style="margin-bottom:18px">
+            <label class="form-label">Report Schedule</label>
+            <select class="form-select" id="report-time">
+              <option value="04:00">4:00 AM Daily</option>
+              <option value="08:00">8:00 AM Daily</option>
+              <option value="18:00">6:00 PM Daily</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="saveReportSettings()" style="width:100%;justify-content:center">Save Settings</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
+    <div class="page" id="page-profile">
+      <div class="page-header">
+        <div><div class="page-title">⚙️ My Profile</div><div class="page-sub">Manage your account settings</div></div>
+      </div>
+      <div class="glass-card" style="padding:28px;max-width:480px">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+          <div class="avatar avatar-lg c0" id="profile-avatar"></div>
+          <div>
+            <div style="font-size:20px;font-weight:700" id="profile-name"></div>
+            <div style="font-size:13px;color:var(--mid)" id="profile-role"></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input class="form-input" id="profile-name-input"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input class="form-input" id="profile-email-input" type="email"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">New Password (leave blank to keep current)</label>
+            <input class="form-input" id="profile-password-input" type="password" placeholder="New password..."/>
+          </div>
+          <button class="btn btn-primary" onclick="saveProfile()" style="justify-content:center">Save Changes</button>
+          <button class="btn btn-danger" onclick="doLogout()" style="justify-content:center">🚪 Sign Out</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- MODAL: Create POD -->
+<div class="modal-overlay" id="modal-create-pod">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="pod-modal-title">🫧 Create POD</div>
+      <button class="modal-close" onclick="closeModal('modal-create-pod')">✕</button>
+    </div>
+    <input type="hidden" id="pod-edit-id"/>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-group"><label class="form-label">POD Name</label><input class="form-input" id="pod-name" placeholder="e.g. Pod Alpha"/></div>
+      <div class="form-group"><label class="form-label">Focus Area</label><input class="form-input" id="pod-focus" placeholder="e.g. Enterprise SaaS"/></div>
+      <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="pod-desc" placeholder="Brief description..."></textarea></div>
+      <div class="form-group">
+        <label class="form-label">Color</label>
+        <div class="color-swatches" id="pod-color-swatches"></div>
+        <input type="hidden" id="pod-color" value="blue"/>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:6px">
+        <button class="btn btn-secondary" onclick="closeModal('modal-create-pod')" style="flex:1;justify-content:center">Cancel</button>
+        <button class="btn btn-primary" onclick="savePod()" style="flex:1;justify-content:center" id="pod-save-btn">Create POD</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Create User -->
+<div class="modal-overlay" id="modal-create-user">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="user-modal-title">👤 Add Team Member</div>
+      <button class="modal-close" onclick="closeModal('modal-create-user')">✕</button>
+    </div>
+    <input type="hidden" id="user-edit-id"/>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="user-name" placeholder="Full name"/></div>
+      <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="user-email" type="email" placeholder="user@company.com"/></div>
+      <div class="form-group"><label class="form-label">Password</label><input class="form-input" id="user-password" type="password" placeholder="Set password (leave blank to keep on edit)"/></div>
+      <div class="form-group"><label class="form-label">Role Title</label><input class="form-input" id="user-role" placeholder="e.g. BDR, SDR, Senior BDR"/></div>
+      <div class="form-group">
+        <label class="form-label">Account Type</label>
+        <select class="form-select" id="user-is-manager">
+          <option value="false">BDR / Team Member</option>
+          <option value="true">Manager / Admin</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Assign to POD (optional)</label><select class="form-select" id="user-pod"><option value="">No POD</option></select></div>
+      <div style="display:flex;gap:10px;margin-top:6px">
+        <button class="btn btn-secondary" onclick="closeModal('modal-create-user')" style="flex:1;justify-content:center">Cancel</button>
+        <button class="btn btn-primary" onclick="saveUser()" style="flex:1;justify-content:center" id="user-save-btn">Add Member</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Create Task -->
+<div class="modal-overlay" id="modal-create-task">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📋 Assign Task</div>
+      <button class="modal-close" onclick="closeModal('modal-create-task')">✕</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="form-group"><label class="form-label">Assign To</label><select class="form-select" id="task-assignee"><option value="">Select team member</option></select></div>
+      <div class="form-group"><label class="form-label">Task Title</label><input class="form-input" id="task-title" placeholder="e.g. Follow up with Acme Corp"/></div>
+      <div class="form-group"><label class="form-label">Description / Notes</label><textarea class="form-textarea" id="task-desc" placeholder="Add context, instructions..."></textarea></div>
+      <div class="form-group"><label class="form-label">Type</label><select class="form-select" id="task-type"><option value="followup">Follow-up</option><option value="outreach">Outreach Task</option><option value="call">Call Task</option><option value="meeting">Meeting Prep</option><option value="other">Other</option></select></div>
+      <div class="form-group"><label class="form-label">Due Date</label><input class="form-input" id="task-due" type="date"/></div>
+      <div class="form-group"><label class="form-label">Priority</label><select class="form-select" id="task-priority"><option value="high">🔴 High</option><option value="medium" selected>🟡 Medium</option><option value="low">🟢 Low</option></select></div>
+      <div style="display:flex;gap:10px;margin-top:6px">
+        <button class="btn btn-secondary" onclick="closeModal('modal-create-task')" style="flex:1;justify-content:center">Cancel</button>
+        <button class="btn btn-primary" onclick="createTask()" style="flex:1;justify-content:center" id="task-save-btn">Assign Task</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+// Replace with your actual backend URL (Railway, Render, or any Node hosting)
+const API = window.location.hostname === 'localhost'
+  ? 'http://localhost:3001/api'
+  : (window.BACKEND_URL || 'YOUR_BACKEND_URL_HERE') + '/api';
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let currentUser = null;
+let allUsers = [];
+let allPods = [];
+let allTimesheets = [];
+let allTasks = [];
+let tsValues = {};
+
+const METRICS = [
+  { key: 'li_requests', label: 'LinkedIn Requests', icon: '💼', color: 'blue', bg: 'rgba(0,113,227,0.1)' },
+  { key: 'emails_sent', label: 'Emails Sent', icon: '📧', color: 'green', bg: 'rgba(52,199,89,0.1)' },
+  { key: 'calls_made', label: 'Calls Made', icon: '📞', color: 'orange', bg: 'rgba(255,149,0,0.1)' },
+  { key: 'calls_answered', label: 'Calls Answered', icon: '✅', color: 'teal', bg: 'rgba(90,200,250,0.1)' },
+  { key: 'meetings_scheduled', label: 'Meetings Scheduled', icon: '📅', color: 'purple', bg: 'rgba(175,82,222,0.1)' },
+  { key: 'meetings_done', label: 'Meetings Done', icon: '🤝', color: 'red', bg: 'rgba(255,59,48,0.1)' },
+];
+const POD_COLORS = {
+  blue: '#0071e3', green: '#34c759', orange: '#ff9500',
+  purple: '#af52de', red: '#ff3b30', teal: '#5ac8fa',
+};
+const METRIC_COLORS = { blue:'#0071e3', green:'#34c759', orange:'#ff9500', purple:'#af52de', red:'#ff3b30', teal:'#5ac8fa' };
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function getToken() { return localStorage.getItem('pipeline_token'); }
+function setToken(t) { localStorage.setItem('pipeline_token', t); }
+function clearToken() { localStorage.removeItem('pipeline_token'); }
+
+async function apiCall(path, method='GET', body=null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  const token = getToken();
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+function today() { return new Date().toISOString().split('T')[0]; }
+function fmtDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+function timeAgo(ts) {
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff/60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins/60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs/24)}d ago`;
+}
+function initials(name) { return (name||'?').split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2); }
+function getUser(id) { return allUsers.find(u => u.id === id); }
+function getPod(id) { return allPods.find(p => p.id === id); }
+
+let toastTimeout;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+function openModal(id) { document.getElementById(id)?.classList.add('open'); }
+function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
+document.addEventListener('click', e => { if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('open'); });
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  errEl.style.display = 'none';
+  if (!email || !pass) { errEl.style.display = 'block'; errEl.textContent = 'Please enter email and password'; return; }
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  try {
+    const { token, user } = await apiCall('/auth/login', 'POST', { email, password: pass });
+    setToken(token);
+    currentUser = user;
+    await loadAllData();
+    showApp();
+  } catch (err) {
+    errEl.style.display = 'block';
+    errEl.textContent = err.message || 'Invalid credentials';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+function doLogout() {
+  clearToken();
+  currentUser = null; allUsers = []; allPods = []; allTimesheets = []; allTasks = [];
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-password').value = '';
+}
+
+async function checkAuth() {
+  const token = getToken();
+  document.getElementById('loading').style.display = 'none';
+  if (!token) { document.getElementById('login-screen').style.display = 'flex'; return; }
+  try {
+    const user = await apiCall('/auth/me');
+    currentUser = user;
+    await loadAllData();
+    showApp();
+  } catch {
+    clearToken();
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+}
+
+// ─── DATA LOADING ─────────────────────────────────────────────────────────────
+async function loadAllData() {
+  try {
+    const [users, pods, tasks] = await Promise.all([
+      apiCall('/users'),
+      apiCall('/pods'),
+      apiCall('/tasks'),
+    ]);
+    allUsers = users;
+    allPods = pods;
+    allTasks = tasks;
+
+    // Load timesheets (90 day window)
+    const startDate = new Date(); startDate.setDate(startDate.getDate() - 90);
+    allTimesheets = await apiCall(`/timesheets?startDate=${startDate.toISOString().split('T')[0]}`);
+  } catch (err) {
+    console.error('Failed to load data:', err);
+  }
+}
+
+function showApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  setupUI();
+}
+
+function setupUI() {
+  const u = currentUser;
+  const avatarEl = document.getElementById('sidebar-avatar');
+  avatarEl.textContent = initials(u.name);
+  avatarEl.className = `user-avatar c${u.colorIdx||0}`;
+  document.getElementById('sidebar-name').textContent = u.name;
+  document.getElementById('sidebar-role').textContent = (u.isAdmin || u.isManager) ? 'Manager · Admin' : (u.role||'BDR').toUpperCase();
+  if (u.isAdmin || u.isManager) document.getElementById('admin-nav').style.display = 'block';
+  setGreeting();
+  updateTaskBadge();
+  nav('dashboard', document.querySelector('.nav-item[data-page="dashboard"]'));
+  initColorSwatches();
+}
+
+function setGreeting() {
+  const h = new Date().getHours();
+  const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('dash-greeting').textContent = `${g}, ${currentUser.name.split(' ')[0]} 👋`;
+  document.getElementById('dash-date').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+}
+
+// ─── NAVIGATION ───────────────────────────────────────────────────────────────
+function nav(page, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const pg = document.getElementById(`page-${page}`);
+  if (pg) pg.classList.add('active');
+
+  if (page === 'dashboard') renderDashboard();
+  else if (page === 'leaderboard') renderLeaderboard();
+  else if (page === 'timesheet') renderTimesheet();
+  else if (page === 'mytasks') renderMyTasks();
+  else if (page === 'pods') renderPods();
+  else if (page === 'users') renderUsers();
+  else if (page === 'tasks') renderAdminTasks();
+  else if (page === 'reports') renderReports();
+  else if (page === 'profile') renderProfile();
+}
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function getFilteredSheets(filter, podId) {
+  let sheets = allTimesheets;
+  const now = new Date();
+  if (filter === 'today') sheets = sheets.filter(s => s.date === today());
+  else if (filter === 'week') { const w = new Date(now); w.setDate(w.getDate()-7); sheets = sheets.filter(s => new Date(s.date) >= w); }
+  else if (filter === 'month') { const m = new Date(now); m.setMonth(m.getMonth()-1); sheets = sheets.filter(s => new Date(s.date) >= m); }
+  if (podId && podId !== 'all') {
+    const podUserIds = allUsers.filter(u => u.podId === podId).map(u => u.id);
+    sheets = sheets.filter(s => podUserIds.includes(s.userId));
+  }
+  return sheets;
+}
+
+function renderDashboard() {
+  const filter = document.getElementById('dash-filter').value;
+  const podId = document.getElementById('dash-pod-filter').value;
+  const sheets = getFilteredSheets(filter, podId);
+
+  // Populate pod filter
+  const pf = document.getElementById('dash-pod-filter');
+  const cur = pf.value;
+  pf.innerHTML = '<option value="all">All PODs</option>';
+  allPods.forEach(p => { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; pf.appendChild(o); });
+  pf.value = cur;
+
+  // Team stats
+  const totals = {};
+  METRICS.forEach(m => totals[m.key] = 0);
+  sheets.forEach(s => METRICS.forEach(m => totals[m.key] += (s[m.key]||0)));
+  document.getElementById('team-stats').innerHTML = METRICS.map(m =>
+    `<div class="stat-card ${m.color}"><div class="stat-icon">${m.icon}</div><div class="stat-value">${totals[m.key]}</div><div class="stat-label">${m.label}</div></div>`
+  ).join('');
+
+  // Member activity
+  const members = allUsers.filter(u => !u.isAdmin && !u.isManager && (podId === 'all' || u.podId === podId));
+  const memberEl = document.getElementById('member-activity-table');
+  if (!members.length) {
+    memberEl.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">No team members</div><div class="empty-desc">Add members to track activity</div></div>';
+  } else {
+    memberEl.innerHTML = `<table><thead><tr><th>Member</th>${METRICS.map(m=>`<th>${m.icon}</th>`).join('')}</tr></thead><tbody>${
+      members.map(u => {
+        const us = sheets.filter(s => s.userId === u.id);
+        const t = {}; METRICS.forEach(m => t[m.key] = us.reduce((a,s)=>a+(s[m.key]||0),0));
+        const pod = u.podId ? getPod(u.podId) : null;
+        return `<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="avatar avatar-sm c${u.colorIdx||0}">${initials(u.name)}</div><div><div style="font-weight:600;font-size:13px">${u.name}</div>${pod?`<div style="font-size:11px;color:var(--mid)">${pod.name}</div>`:''}</div></div></td>${METRICS.map(m=>`<td style="text-align:center;font-weight:600">${t[m.key]||0}</td>`).join('')}</tr>`;
+      }).join('')
+    }</tbody></table>`;
+  }
+
+  // Activity feed
+  const recent = [...allTimesheets].sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt)).slice(0,8);
+  const feedEl = document.getElementById('activity-feed');
+  if (!recent.length) {
+    feedEl.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">No activity yet</div></div>';
+  } else {
+    feedEl.innerHTML = recent.map(s => {
+      const u = getUser(s.userId);
+      if (!u) return '';
+      const top = METRICS.filter(m=>s[m.key]>0).slice(0,2).map(m=>`${m.icon} ${s[m.key]} ${m.label}`).join(', ');
+      return `<div class="feed-item"><div class="avatar avatar-sm c${u.colorIdx||0}">${initials(u.name)}</div><div><div class="feed-text"><strong>${u.name}</strong> logged ${top||'activity'} on ${fmtDate(s.date)}</div><div class="feed-time">${timeAgo(s.updatedAt)}</div></div></div>`;
+    }).filter(Boolean).join('');
+  }
+
+  // POD Performance
+  const podEl = document.getElementById('pod-performance');
+  if (!allPods.length) { podEl.innerHTML = '<div style="padding:16px;color:var(--mid);font-size:13px">No PODs created yet</div>'; return; }
+  podEl.innerHTML = allPods.map(pod => {
+    const pUsers = allUsers.filter(u => u.podId === pod.id);
+    const pSheets = sheets.filter(s => pUsers.find(u => u.id === s.userId));
+    const pT = {}; METRICS.forEach(m => pT[m.key] = pSheets.reduce((a,s)=>a+(s[m.key]||0),0));
+    const col = POD_COLORS[pod.color||'blue'];
+    return `<div style="background:rgba(0,0,0,0.04);border-radius:14px;padding:16px;border-left:4px solid ${col}"><div style="font-weight:700;font-size:15px;color:${col}">${pod.name}</div><div style="font-size:11px;color:var(--mid);margin-bottom:12px">${pod.focus||'General'} · ${pUsers.length} members</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${METRICS.slice(0,4).map(m=>`<div><div style="font-size:18px;font-weight:700;color:${col}">${pT[m.key]||0}</div><div style="font-size:10px;color:var(--mid)">${m.label}</div></div>`).join('')}</div></div>`;
+  }).join('');
+}
+
+// ─── LEADERBOARD ──────────────────────────────────────────────────────────────
+function renderLeaderboard() {
+  const filter = document.getElementById('lb-filter').value;
+  const sheets = getFilteredSheets(filter, 'all');
+  const members = allUsers.filter(u => !u.isAdmin && !u.isManager);
+  const weights = [1,1,1,2,3,4];
+  const scored = members.map(u => {
+    const us = sheets.filter(s => s.userId === u.id);
+    const score = METRICS.reduce((a, m, i) => a + (us.reduce((b,s)=>b+(s[m.key]||0),0) * weights[i]), 0);
+    const t = {}; METRICS.forEach(m => t[m.key] = us.reduce((a,s)=>a+(s[m.key]||0),0));
+    return { user: u, score, totals: t };
+  }).sort((a,b) => b.score - a.score);
+
+  const el = document.getElementById('leaderboard-content');
+  if (!scored.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">🏆</div><div class="empty-title">No data yet</div><div class="empty-desc">Team members need to log their daily activity</div></div>'; return; }
+
+  const rankIcons = ['🥇','🥈','🥉'];
+  el.innerHTML = `
+    <div style="padding:16px 18px;border-bottom:1px solid rgba(0,0,0,0.06);display:flex;align-items:center;gap:10px;background:rgba(0,113,227,0.04)">
+      <div style="width:20px;text-align:center;font-size:11px;font-weight:600;color:var(--mid)">#</div>
+      <div style="flex:1;font-size:11px;font-weight:600;color:var(--mid);letter-spacing:0.5px;text-transform:uppercase">Member</div>
+      ${METRICS.map(m=>`<div style="width:40px;text-align:center;font-size:12px">${m.icon}</div>`).join('')}
+      <div style="width:60px;text-align:right;font-size:11px;font-weight:600;color:var(--mid);text-transform:uppercase">Score</div>
+    </div>
+    ${scored.map((s,i) => {
+      const pod = s.user.podId ? getPod(s.user.podId) : null;
+      const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+      return `<div class="lb-row"><div class="lb-rank ${rankClass}">${i<3?rankIcons[i]:i+1}</div><div class="avatar avatar-sm c${s.user.colorIdx||0}">${initials(s.user.name)}</div><div style="flex:1"><div style="font-size:14px;font-weight:600">${s.user.name}</div>${pod?`<div style="font-size:11px;color:var(--mid)">${pod.name}</div>`:''}</div>${METRICS.map(m=>`<div style="width:40px;text-align:center;font-size:13px;font-weight:600">${s.totals[m.key]||0}</div>`).join('')}<div style="width:60px;text-align:right;font-size:16px;font-weight:700;color:var(--blue)">${s.score}</div></div>`;
+    }).join('')}
+  `;
+}
+
+// ─── TIMESHEET ────────────────────────────────────────────────────────────────
+METRICS.forEach(m => tsValues[m.key] = 0);
+
+function renderTimesheet() {
+  document.getElementById('ts-date').value = today();
+  loadTimesheetForDate();
+  renderTsHistory();
+  renderTsPersonalStats();
+}
+
+function loadTimesheetForDate() {
+  const date = document.getElementById('ts-date').value || today();
+  const entry = allTimesheets.find(s => s.userId === currentUser.id && s.date === date);
+  METRICS.forEach(m => {
+    tsValues[m.key] = entry ? (entry[m.key]||0) : 0;
+    const el = document.getElementById(`ts_${m.key}`);
+    if (el) el.value = tsValues[m.key];
+  });
+  document.getElementById('ts-metrics').innerHTML = METRICS.map(m => `
+    <div class="ts-metric">
+      <div class="ts-metric-info">
+        <div class="ts-metric-icon" style="background:${m.bg}">${m.icon}</div>
+        <div><div class="ts-metric-name">${m.label}</div></div>
+      </div>
+      <div class="ts-counter">
+        <button class="ts-counter-btn" onclick="adjustMetric('${m.key}',-1)">−</button>
+        <input class="ts-counter-val" id="ts_${m.key}" type="number" min="0" value="${tsValues[m.key]}" onchange="tsValues['${m.key}']=parseInt(this.value)||0"/>
+        <button class="ts-counter-btn" onclick="adjustMetric('${m.key}',1)">+</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function adjustMetric(key, delta) {
+  tsValues[key] = Math.max(0, (tsValues[key]||0) + delta);
+  const el = document.getElementById(`ts_${key}`);
+  if (el) el.value = tsValues[key];
+}
+
+async function saveTimesheet() {
+  const date = document.getElementById('ts-date').value || today();
+  const btn = document.getElementById('ts-save-btn');
+  METRICS.forEach(m => { const el = document.getElementById(`ts_${m.key}`); if (el) tsValues[m.key] = parseInt(el.value)||0; });
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    await apiCall('/timesheets', 'POST', { date, ...tsValues });
+    // Update local cache
+    const idx = allTimesheets.findIndex(s => s.userId === currentUser.id && s.date === date);
+    const entry = { userId: currentUser.id, date, ...tsValues, updatedAt: new Date().toISOString() };
+    if (idx >= 0) allTimesheets[idx] = entry; else allTimesheets.unshift(entry);
+    toast('✅ Activity logged successfully');
+    renderTsHistory();
+    renderTsPersonalStats();
+  } catch (err) { toast('❌ ' + err.message); }
+  finally { btn.disabled = false; btn.textContent = 'Save Entry'; }
+}
+
+function resetTimesheet() {
+  METRICS.forEach(m => { tsValues[m.key] = 0; const el = document.getElementById(`ts_${m.key}`); if (el) el.value = 0; });
+}
+
+function renderTsHistory() {
+  const userSheets = allTimesheets.filter(s => s.userId === currentUser.id).slice(0,10);
+  const el = document.getElementById('ts-history');
+  if (!el) return;
+  if (!userSheets.length) { el.innerHTML = '<div style="padding:12px;font-size:13px;color:var(--mid)">No entries yet</div>'; return; }
+  el.innerHTML = userSheets.map(s => {
+    const top = METRICS.filter(m=>s[m.key]>0).map(m=>`${m.icon} ${s[m.key]}`).join(' ');
+    return `<div style="padding:8px 0;border-bottom:1px solid rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:13px;font-weight:600">${fmtDate(s.date)}</div><div style="font-size:11px;color:var(--mid);margin-top:2px">${top||'No data'}</div></div><button class="btn btn-secondary btn-sm" onclick="jumpToDate('${s.date}')">Edit</button></div>`;
+  }).join('');
+}
+
+function jumpToDate(d) { document.getElementById('ts-date').value = d; loadTimesheetForDate(); }
+
+function renderTsPersonalStats() {
+  const sheets = allTimesheets.filter(s => s.userId === currentUser.id);
+  const totals = {}; METRICS.forEach(m => totals[m.key] = sheets.reduce((a,s)=>a+(s[m.key]||0),0));
+  const el = document.getElementById('ts-personal-stats');
+  if (!el) return;
+  el.innerHTML = METRICS.map(m => `<div style="display:flex;align-items:center;gap:8px;padding:5px 0"><span>${m.icon}</span><span style="flex:1;font-size:13px;color:var(--mid)">${m.label}</span><span style="font-size:14px;font-weight:700;color:${METRIC_COLORS[m.color]}">${totals[m.key]}</span></div>`).join('');
+}
+
+// ─── MY TASKS ─────────────────────────────────────────────────────────────────
+function renderMyTasks() {
+  const myTasks = allTasks.filter(t => t.assigneeId === currentUser.id);
+  const el = document.getElementById('mytasks-content');
+  if (!myTasks.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">No tasks assigned</div><div class="empty-desc">You\'re all caught up!</div></div>'; updateTaskBadge(); return; }
+  const open = myTasks.filter(t=>!t.done);
+  const done = myTasks.filter(t=>t.done);
+  el.innerHTML = `
+    <div class="section-header"><div class="section-title">Open (${open.length})</div></div>
+    ${open.length ? open.map(t => taskItemHTML(t, false)).join('') : '<div style="padding:12px 18px;font-size:13px;color:var(--mid)">No open tasks 🎉</div>'}
+    ${done.length ? `<div class="section-header" style="margin-top:8px"><div class="section-title">Completed (${done.length})</div></div>${done.map(t => taskItemHTML(t, false)).join('')}` : ''}
+  `;
+  updateTaskBadge();
+}
+
+function taskItemHTML(t, isAdmin) {
+  const types = { followup:'🔁', outreach:'📤', call:'📞', meeting:'📅', other:'📌' };
+  const prios = { high:'pill-red', medium:'pill-orange', low:'pill-green' };
+  const pLabels = { high:'🔴 High', medium:'🟡 Medium', low:'🟢 Low' };
+  const assignee = getUser(t.assigneeId);
+  return `<div class="task-item">
+    <div class="task-check ${t.done?'done':''}" onclick="toggleTask('${t.id}')">${t.done?'✓':''}</div>
+    <div style="flex:1">
+      <div class="task-title ${t.done?'done-text':''}">${types[t.type]||'📌'} ${t.title}</div>
+      <div class="task-meta">${t.description||''} ${t.dueDate?`· Due ${fmtDate(t.dueDate)}`:''}</div>
+      <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
+        <span class="pill ${prios[t.priority]||'pill-orange'}">${pLabels[t.priority]||'Medium'}</span>
+        ${isAdmin && assignee ? `<span class="pill pill-blue">${assignee.name}</span>` : ''}
+        ${t.done ? '<span class="pill pill-green">Done</span>' : ''}
+      </div>
+    </div>
+    ${isAdmin ? `<button class="btn btn-danger btn-sm" onclick="deleteTask('${t.id}')">Delete</button>` : ''}
+  </div>`;
+}
+
+async function toggleTask(id) {
+  const t = allTasks.find(x=>x.id===id);
+  if (!t) return;
+  try {
+    await apiCall(`/tasks/${id}`, 'PUT', { done: !t.done });
+    t.done = !t.done; t.doneAt = t.done ? new Date().toISOString() : null;
+    const u = currentUser;
+    if (u.isAdmin || u.isManager) renderAdminTasks(); else renderMyTasks();
+    updateTaskBadge();
+  } catch(err) { toast('❌ ' + err.message); }
+}
+
+function updateTaskBadge() {
+  if (!currentUser) return;
+  const open = allTasks.filter(t => t.assigneeId === currentUser.id && !t.done).length;
+  const badge = document.getElementById('task-badge');
+  badge.style.display = open > 0 ? 'inline' : 'none';
+  badge.textContent = open;
+}
+
+// ─── PODS ─────────────────────────────────────────────────────────────────────
+function renderPods() {
+  const el = document.getElementById('pods-grid');
+  if (!allPods.length) {
+    el.innerHTML = `<div class="empty-state" style="grid-column:1/-1;background:var(--glass);backdrop-filter:blur(40px);border:1px solid var(--glass-b);border-radius:var(--r);padding:50px"><div class="empty-icon">🫧</div><div class="empty-title">No PODs yet</div><div class="empty-desc">Create your first POD to organize your team</div></div>`;
+    return;
+  }
+  el.innerHTML = allPods.map(pod => {
+    const members = allUsers.filter(u => u.podId === pod.id && !u.isAdmin && !u.isManager);
+    const todayS = allTimesheets.filter(s => s.date === today() && members.find(u=>u.id===s.userId));
+    const t = {}; METRICS.forEach(m => t[m.key] = todayS.reduce((a,s)=>a+(s[m.key]||0),0));
+    const col = POD_COLORS[pod.color||'blue'];
+    return `<div class="pod-card">
+      <div style="padding:18px 18px 14px;border-left:4px solid ${col}">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="font-size:16px;font-weight:700">${pod.name}</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="editPodModal('${pod.id}')">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deletePod('${pod.id}')">Delete</button>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--mid);margin-top:3px">${pod.focus||'General Outreach'}</div>
+        ${pod.description ? `<div style="font-size:12px;color:var(--mid);margin-top:6px">${pod.description}</div>` : ''}
+      </div>
+      <div style="padding:10px 18px">
+        <div style="font-size:11px;font-weight:600;color:var(--mid);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Members (${members.length})</div>
+        ${members.length ? members.map(u=>`<div class="pod-member-row"><div class="avatar avatar-sm c${u.colorIdx||0}">${initials(u.name)}</div><div style="font-size:13px;font-weight:500">${u.name}</div><span class="pill pill-gray" style="margin-left:auto;font-size:10px">${u.role||'BDR'}</span></div>`).join('') : '<div style="font-size:12px;color:var(--mid)">No members yet</div>'}
+      </div>
+      <div style="padding:10px 18px 16px;border-top:1px solid rgba(0,0,0,0.05)">
+        <div style="font-size:11px;font-weight:600;color:var(--mid);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Today's Activity</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          ${METRICS.slice(0,4).map(m=>`<div><span style="font-size:14px">${m.icon}</span> <strong>${t[m.key]||0}</strong></div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function initColorSwatches() {
+  const el = document.getElementById('pod-color-swatches');
+  if (!el) return;
+  el.innerHTML = Object.entries(POD_COLORS).map(([name, color]) =>
+    `<div class="color-swatch ${name==='blue'?'selected':''}" style="background:${color}" onclick="selectPodColor('${name}',this)" data-color="${name}"></div>`
+  ).join('');
+}
+
+function selectPodColor(name, el) {
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('pod-color').value = name;
+}
+
+function editPodModal(id) {
+  const pod = getPod(id);
+  if (!pod) return;
+  document.getElementById('pod-modal-title').textContent = '✏️ Edit POD';
+  document.getElementById('pod-edit-id').value = id;
+  document.getElementById('pod-name').value = pod.name;
+  document.getElementById('pod-focus').value = pod.focus || '';
+  document.getElementById('pod-desc').value = pod.description || '';
+  document.getElementById('pod-color').value = pod.color || 'blue';
+  document.querySelectorAll('.color-swatch').forEach(s => {
+    s.classList.toggle('selected', s.dataset.color === (pod.color||'blue'));
+  });
+  document.getElementById('pod-save-btn').textContent = 'Save Changes';
+  openModal('modal-create-pod');
+}
+
+async function savePod() {
+  const id = document.getElementById('pod-edit-id').value;
+  const data = {
+    name: document.getElementById('pod-name').value.trim(),
+    focus: document.getElementById('pod-focus').value.trim(),
+    description: document.getElementById('pod-desc').value.trim(),
+    color: document.getElementById('pod-color').value || 'blue',
+  };
+  if (!data.name) { toast('❌ POD name is required'); return; }
+  const btn = document.getElementById('pod-save-btn');
+  btn.disabled = true;
+  try {
+    if (id) {
+      await apiCall(`/pods/${id}`, 'PUT', data);
+      const idx = allPods.findIndex(p => p.id === id);
+      if (idx >= 0) allPods[idx] = { ...allPods[idx], ...data };
+      toast('✅ POD updated');
+    } else {
+      const res = await apiCall('/pods', 'POST', data);
+      allPods.push(res.pod);
+      toast('✅ POD created');
+    }
+    closeModal('modal-create-pod');
+    document.getElementById('pod-edit-id').value = '';
+    document.getElementById('pod-modal-title').textContent = '🫧 Create POD';
+    document.getElementById('pod-name').value = '';
+    document.getElementById('pod-focus').value = '';
+    document.getElementById('pod-desc').value = '';
+    document.getElementById('pod-save-btn').textContent = 'Create POD';
+    renderPods();
+    refreshUserPodDropdowns();
+  } catch(err) { toast('❌ ' + err.message); }
+  finally { btn.disabled = false; }
+}
+
+async function deletePod(id) {
+  if (!confirm('Delete this POD? Members will be unassigned.')) return;
+  try {
+    await apiCall(`/pods/${id}`, 'DELETE');
+    allPods = allPods.filter(p => p.id !== id);
+    allUsers.forEach(u => { if (u.podId === id) u.podId = null; });
+    toast('✅ POD deleted');
+    renderPods();
+  } catch(err) { toast('❌ ' + err.message); }
+}
+
+// ─── USERS ────────────────────────────────────────────────────────────────────
+function renderUsers() {
+  refreshUserPodDropdowns();
+  const tbody = document.getElementById('users-tbody');
+  const nonMaster = allUsers.filter(u => u.id !== 'admin-master');
+  if (!nonMaster.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--mid)">No users yet</td></tr>'; return; }
+  tbody.innerHTML = nonMaster.map(u => {
+    const pod = u.podId ? getPod(u.podId) : null;
+    const isMe = u.id === currentUser.id;
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:10px"><div class="avatar avatar-sm c${u.colorIdx||0}">${initials(u.name)}</div><div><div style="font-weight:600">${u.name}${isMe?' (You)':''}</div><div style="font-size:11px;color:var(--mid)">${u.email}</div></div></div></td>
+      <td>${u.role||'BDR'}</td>
+      <td>${pod ? `<span class="pill pill-blue">${pod.name}</span>` : '<span style="color:var(--mid)">—</span>'}</td>
+      <td style="font-size:12px;color:var(--mid)">${u.email}</td>
+      <td>${(u.isAdmin||u.isManager) ? '<span class="pill pill-purple">Manager</span>' : '<span class="pill pill-gray">BDR</span>'}</td>
+      <td><div style="display:flex;gap:6px">
+        <button class="btn btn-secondary btn-sm" onclick="editUserModal('${u.id}')">Edit</button>
+        ${!isMe ? `<button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}')">Delete</button>` : ''}
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function refreshUserPodDropdowns() {
+  ['user-pod', 'task-assignee'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (id === 'user-pod') {
+      el.innerHTML = '<option value="">No POD</option>' + allPods.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    } else {
+      const members = allUsers.filter(u => !u.isAdmin && !u.isManager);
+      el.innerHTML = '<option value="">Select team member</option>' + members.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+    }
+  });
+}
+
+function editUserModal(id) {
+  const u = getUser(id);
+  if (!u) return;
+  document.getElementById('user-modal-title').textContent = '✏️ Edit Member';
+  document.getElementById('user-edit-id').value = id;
+  document.getElementById('user-name').value = u.name;
+  document.getElementById('user-email').value = u.email;
+  document.getElementById('user-password').value = '';
+  document.getElementById('user-role').value = u.role || 'BDR';
+  document.getElementById('user-is-manager').value = (u.isAdmin || u.isManager) ? 'true' : 'false';
+  const podEl = document.getElementById('user-pod');
+  podEl.value = u.podId || '';
+  document.getElementById('user-save-btn').textContent = 'Save Changes';
+  openModal('modal-create-user');
+}
+
+async function saveUser() {
+  const id = document.getElementById('user-edit-id').value;
+  const data = {
+    name: document.getElementById('user-name').value.trim(),
+    email: document.getElementById('user-email').value.trim(),
+    password: document.getElementById('user-password').value,
+    role: document.getElementById('user-role').value.trim() || 'BDR',
+    isManager: document.getElementById('user-is-manager').value === 'true',
+    podId: document.getElementById('user-pod').value || null,
+  };
+  if (!data.name || !data.email) { toast('❌ Name and email are required'); return; }
+  if (!id && !data.password) { toast('❌ Password is required for new users'); return; }
+  const btn = document.getElementById('user-save-btn');
+  btn.disabled = true;
+  try {
+    if (id) {
+      if (!data.password) delete data.password;
+      await apiCall(`/users/${id}`, 'PUT', data);
+      const idx = allUsers.findIndex(u => u.id === id);
+      if (idx >= 0) allUsers[idx] = { ...allUsers[idx], ...data, isAdmin: data.isManager };
+      toast('✅ Member updated');
+    } else {
+      const res = await apiCall('/users', 'POST', data);
+      allUsers.push(res.user);
+      toast('✅ Member added');
+    }
+    closeModal('modal-create-user');
+    document.getElementById('user-edit-id').value = '';
+    document.getElementById('user-modal-title').textContent = '👤 Add Team Member';
+    document.getElementById('user-save-btn').textContent = 'Add Member';
+    ['user-name','user-email','user-password','user-role'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    renderUsers();
+  } catch(err) { toast('❌ ' + err.message); }
+  finally { btn.disabled = false; }
+}
+
+async function deleteUser(id) {
+  const u = getUser(id);
+  if (!confirm(`Delete ${u?.name}? This will also delete their timesheets and tasks.`)) return;
+  try {
+    await apiCall(`/users/${id}`, 'DELETE');
+    allUsers = allUsers.filter(u => u.id !== id);
+    allTimesheets = allTimesheets.filter(s => s.userId !== id);
+    allTasks = allTasks.filter(t => t.assigneeId !== id);
+    toast('✅ Member deleted');
+    renderUsers();
+  } catch(err) { toast('❌ ' + err.message); }
+}
+
+// ─── ADMIN TASKS ──────────────────────────────────────────────────────────────
+function renderAdminTasks() {
+  refreshUserPodDropdowns();
+  const el = document.getElementById('tasks-list');
+  if (!el) return;
+  if (!allTasks.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No tasks assigned</div><div class="empty-desc">Assign tasks to your team members</div></div>'; return; }
+  const open = allTasks.filter(t=>!t.done);
+  const done = allTasks.filter(t=>t.done);
+  el.innerHTML = `
+    <div class="section-header"><div class="section-title">Open (${open.length})</div></div>
+    ${open.length ? open.map(t => taskItemHTML(t, true)).join('') : '<div style="padding:12px 18px;font-size:13px;color:var(--mid)">No open tasks</div>'}
+    ${done.length ? `<div class="section-header"><div class="section-title">Completed (${done.length})</div></div>${done.map(t => taskItemHTML(t, true)).join('')}` : ''}
+  `;
+}
+
+async function createTask() {
+  const data = {
+    assigneeId: document.getElementById('task-assignee').value,
+    title: document.getElementById('task-title').value.trim(),
+    description: document.getElementById('task-desc').value.trim(),
+    type: document.getElementById('task-type').value,
+    dueDate: document.getElementById('task-due').value || null,
+    priority: document.getElementById('task-priority').value,
+  };
+  if (!data.assigneeId) { toast('❌ Please select a team member'); return; }
+  if (!data.title) { toast('❌ Task title is required'); return; }
+  const btn = document.getElementById('task-save-btn');
+  btn.disabled = true;
+  try {
+    const res = await apiCall('/tasks', 'POST', data);
+    allTasks.unshift({ id: res.id, ...data, createdBy: currentUser.id, done: false, createdAt: new Date().toISOString() });
+    closeModal('modal-create-task');
+    ['task-title','task-desc','task-due'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    toast('✅ Task assigned');
+    renderAdminTasks();
+    updateTaskBadge();
+  } catch(err) { toast('❌ ' + err.message); }
+  finally { btn.disabled = false; }
+}
+
+async function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  try {
+    await apiCall(`/tasks/${id}`, 'DELETE');
+    allTasks = allTasks.filter(t => t.id !== id);
+    toast('✅ Task deleted');
+    renderAdminTasks();
+  } catch(err) { toast('❌ ' + err.message); }
+}
+
+// ─── REPORTS ──────────────────────────────────────────────────────────────────
+async function renderReports() {
+  const today_ = today();
+  const monthAgo = new Date(); monthAgo.setDate(monthAgo.getDate()-30);
+  document.getElementById('report-start').value = monthAgo.toISOString().split('T')[0];
+  document.getElementById('report-end').value = today_;
+  try {
+    const settings = await apiCall('/report-settings');
+    if (settings.manager_email) document.getElementById('report-email').value = settings.manager_email;
+    if (settings.schedule_time) document.getElementById('report-time').value = settings.schedule_time;
+  } catch {}
+}
+
+async function saveReportSettings() {
+  try {
+    await apiCall('/report-settings', 'PUT', {
+      managerEmail: document.getElementById('report-email').value,
+      scheduleTime: document.getElementById('report-time').value,
+    });
+    toast('✅ Settings saved');
+  } catch(err) { toast('❌ ' + err.message); }
+}
+
+async function exportExcelReport() {
+  const startDate = document.getElementById('report-start')?.value || '';
+  const endDate = document.getElementById('report-end')?.value || '';
+  toast('⏳ Generating report...');
+  try {
+    const data = await apiCall(`/reports/export?startDate=${startDate}&endDate=${endDate}`);
+    generateExcel(data);
+  } catch(err) { toast('❌ ' + err.message); }
+}
+
+function generateExcel(data) {
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Summary per user
+  const summaryData = [
+    ['Name', 'Email', 'Role', 'POD', 'LI Requests', 'Emails Sent', 'Calls Made', 'Calls Answered', 'Meetings Scheduled', 'Meetings Done', 'Score']
+  ];
+  const weights = [1,1,1,2,3,4];
+  data.users.forEach(u => {
+    const userSheets = data.timesheets.filter(s => s.user_id === u.id);
+    const pod = data.pods.find(p => p.id === u.pod_id);
+    const totals = METRICS.map(m => userSheets.reduce((a,s)=>a+(s[m.key]||0),0));
+    const score = totals.reduce((a, v, i) => a + v * weights[i], 0);
+    summaryData.push([u.name, u.email, u.role, pod?.name||'—', ...totals, score]);
+  });
+  const summarySheet = XLSX.utils.aoa_to_sheet(summaryData);
+  summarySheet['!cols'] = [20,25,15,15,14,14,14,16,20,16,10].map(w => ({ wch: w }));
+  XLSX.utils.book_append_sheet(wb, summarySheet, 'Team Summary');
+
+  // Sheet 2: Daily timesheets
+  const tsData = [['Date', 'Name', 'Email', 'POD', 'LI Requests', 'Emails Sent', 'Calls Made', 'Calls Answered', 'Meetings Scheduled', 'Meetings Done']];
+  data.timesheets.forEach(s => {
+    const u = data.users.find(u => u.id === s.user_id);
+    const pod = data.pods.find(p => p.id === u?.pod_id);
+    if (!u) return;
+    tsData.push([
+      new Date(s.date).toLocaleDateString(), u.name, u.email, pod?.name||'—',
+      s.li_requests||0, s.emails_sent||0, s.calls_made||0, s.calls_answered||0,
+      s.meetings_scheduled||0, s.meetings_done||0
+    ]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tsData), 'Daily Logs');
+
+  // Sheet 3: Tasks
+  const taskData = [['Title', 'Assigned To', 'Type', 'Priority', 'Due Date', 'Status', 'Description']];
+  data.tasks.forEach(t => {
+    const u = data.users.find(u => u.id === t.assignee_id);
+    taskData.push([t.title, u?.name||'—', t.type, t.priority, t.due_date ? new Date(t.due_date).toLocaleDateString() : '—', t.done ? 'Done' : 'Open', t.description||'']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(taskData), 'Tasks');
+
+  // Sheet 4: POD Summary
+  const podData = [['POD Name', 'Focus', 'Members', 'LI Requests', 'Emails Sent', 'Calls Made', 'Calls Answered', 'Meetings Scheduled', 'Meetings Done']];
+  data.pods.forEach(pod => {
+    const podUsers = data.users.filter(u => u.pod_id === pod.id);
+    const podSheets = data.timesheets.filter(s => podUsers.find(u => u.id === s.user_id));
+    const totals = METRICS.map(m => podSheets.reduce((a,s)=>a+(s[m.key]||0),0));
+    podData.push([pod.name, pod.focus||'—', podUsers.length, ...totals]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(podData), 'POD Summary');
+
+  XLSX.writeFile(wb, `PipelineOS_Report_${today()}.xlsx`);
+  toast('✅ Excel report downloaded!');
+}
+
+// ─── PROFILE ──────────────────────────────────────────────────────────────────
+function renderProfile() {
+  const u = currentUser;
+  const avatar = document.getElementById('profile-avatar');
+  avatar.textContent = initials(u.name);
+  avatar.className = `avatar avatar-lg c${u.colorIdx||0}`;
+  document.getElementById('profile-name').textContent = u.name;
+  document.getElementById('profile-role').textContent = (u.isAdmin||u.isManager) ? 'Manager · Admin' : u.role;
+  document.getElementById('profile-name-input').value = u.name;
+  document.getElementById('profile-email-input').value = u.email;
+  document.getElementById('profile-password-input').value = '';
+}
+
+async function saveProfile() {
+  const data = {
+    name: document.getElementById('profile-name-input').value.trim(),
+    email: document.getElementById('profile-email-input').value.trim(),
+    password: document.getElementById('profile-password-input').value,
+  };
+  if (!data.name || !data.email) { toast('❌ Name and email required'); return; }
+  if (!data.password) delete data.password;
+  try {
+    await apiCall(`/users/${currentUser.id}`, 'PUT', data);
+    currentUser.name = data.name;
+    currentUser.email = data.email;
+    document.getElementById('sidebar-name').textContent = data.name;
+    document.getElementById('sidebar-avatar').textContent = initials(data.name);
+    toast('✅ Profile updated');
+  } catch(err) { toast('❌ ' + err.message); }
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  checkAuth();
+  // Auto-refresh data every 60s for real-time updates
+  setInterval(async () => {
+    if (currentUser) {
+      try { await loadAllData(); } catch {}
+    }
+  }, 60000);
+});
+</script>
+</body>
+</html>
