@@ -583,7 +583,7 @@
 // Replace with your actual backend URL (Railway, Render, or any Node hosting)
 const API = window.location.hostname === 'localhost'
   ? 'http://localhost:3001/api'
-  : (window.BACKEND_URL || 'YOUR_BACKEND_URL_HERE') + '/api';
+  : (window.BACKEND_URL || 'https://pipelineos-backend-production.up.railway.app') + '/api';
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let currentUser = null;
